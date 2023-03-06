@@ -1,13 +1,14 @@
 defmodule Annoying.FC.BoardWorker do
   use GenServer
 
-  alias Finch.Response
+  @keepalive_hours 48
+
   alias Annoying.FC.ThreadWorker
 
-  def spawn(board) do
+  def spawn(board, client \\ Annoying.FC.FinchClient) do
     DynamicSupervisor.start_child(
       Annoying.FC.Supervisor,
-      {Annoying.FC.BoardWorker, board}
+      {Annoying.FC.BoardWorker, {board, client}}
     )
   end
 
@@ -21,30 +22,33 @@ defmodule Annoying.FC.BoardWorker do
     ])
   end
 
-  def start_link(board) do
+  def start_link({board, client}) do
     GenServer.start_link(
       __MODULE__,
-      board,
+      {board, client},
       name: {:via, Registry, {Annoying.FC.Registry, {:board, board}}}
     )
   end
 
   def update() do
-    for {board, pid} <- list() do
-      load_threads_async(board, pid)
-    end
+    for {_, pid} <- list(), do: GenServer.cast(pid, :update)
   end
 
   def prune() do
-    for {_, pid} <- list() do
-      GenServer.cast(pid, :prune)
-    end
+    for {_, pid} <- list(), do: GenServer.cast(pid, :prune)
   end
 
   @impl true
-  def init(board) do
-    load_threads_async(board, self())
-    {:ok, %{board: board, threads: %{}}}
+  def init({board, client}) do
+    load_threads_async(client, board, self())
+    {:ok, %{client: client, board: board, threads: %{}}}
+  end
+
+  @impl true
+  def handle_cast(:update, state) do
+    %{client: client, board: board} = state
+    load_threads_async(client, board, self())
+    {:noreply, state}
   end
 
   @impl true
@@ -54,7 +58,7 @@ defmodule Annoying.FC.BoardWorker do
 
     pruned =
       for {thread, modified} <- threads,
-          DateTime.diff(modified, now, :hours) > 48 do
+          @keepalive_hours < DateTime.diff(modified, now, :hours) do
         with [pid] <- ThreadWorker.lookup(board, thread), do: ThreadWorker.delete(pid)
         thread
       end
@@ -63,42 +67,37 @@ defmodule Annoying.FC.BoardWorker do
   end
 
   @impl true
-  def handle_info({:fetched, pages}, state) do
-    %{board: board, threads: threads} = state
-
-    updated_threads =
-      for %{"threads" => list} <- pages,
-          %{"no" => thread, "last_modified" => modified} <- list,
-          {:ok, date} = DateTime.from_unix(modified),
-          into: %{},
-          do: {thread, date}
-
-    for {thread, modified} <- updated_threads do
-      case {ThreadWorker.lookup(board, thread), Map.fetch(threads, thread)} do
-        {[], _} ->
-          ThreadWorker.spawn(board, thread)
-
-        {[pid], {:ok, last_modified}} ->
-          case DateTime.compare(last_modified, modified) do
-            :lt -> ThreadWorker.update(pid)
-            _ -> :ok
-          end
-
-        _ ->
-          :ok
-      end
-    end
-
-    {:noreply, Map.put(state, :threads, Map.merge(threads, updated_threads))}
+  def handle_cast({:fetched, pages}, state) do
+    updated_threads = as_thread_updates(pages)
+    notify_workers(updated_threads, state)
+    {:noreply, %{state | threads: Map.merge(state.threads, updated_threads)}}
   end
 
-  defp load_threads_async(board, pid) do
-    Task.Supervisor.start_child(Annoying.FC.TaskSupervisor, fn ->
-      {:ok, %Response{status: 200, body: body}} =
-        Finch.build(:get, "https://a.4cdn.org/#{board}/threads.json")
-        |> Finch.request(Annoying.FC.Finch)
+  defp notify_workers(updated_threads, %{client: client, board: board, threads: threads}) do
+    for {thread, modified} <- updated_threads do
+      case ThreadWorker.lookup(board, thread) do
+        [] ->
+          ThreadWorker.spawn(board, thread, client)
 
-      send(pid, {:fetched, Jason.decode!(body)})
+        [worker | _] ->
+          with {:ok, last_modified} <- Map.fetch(threads, thread),
+               :lt <- DateTime.compare(last_modified, modified),
+               do: ThreadWorker.update(worker)
+      end
+    end
+  end
+
+  defp as_thread_updates(pages) do
+    for %{threads: list} <- pages,
+        %{no: thread, last_modified: modified} <- list,
+        {:ok, date} = DateTime.from_unix(modified),
+        into: %{},
+        do: {thread, date}
+  end
+
+  defp load_threads_async(client, board, pid) do
+    Task.Supervisor.start_child(Annoying.FC.TaskSupervisor, fn ->
+      GenServer.cast(pid, {:fetched, client.threads!(board)})
     end)
   end
 end
