@@ -1,24 +1,91 @@
 defmodule Annoying.FC.FinchClient do
-  @moduledoc "4Chan API client backed by Finch."
+  use GenServer
   alias Annoying.FC.Client
+  alias Annoying.FC.Post
   alias Finch.Response
   @behaviour Client
 
-  @impl Client
-  def threads!(board) do
-    {:ok, %Response{status: 200, body: body}} =
-      Finch.build(:get, "https://a.4cdn.org/#{board}/threads.json")
-      |> Finch.request(Annoying.FC.Finch)
-
-    Jason.decode!(body, keys: :atoms)
+  def start_link(options) do
+    GenServer.start_link(
+      __MODULE__,
+      [],
+      Keyword.take(options, [:name])
+    )
   end
 
   @impl Client
-  def thread!(board, thread) do
-    {:ok, %Response{status: 200, body: body}} =
-      Finch.build(:get, "https://a.4cdn.org/#{board}/thread/#{thread}.json")
-      |> Finch.request(Annoying.FC.Finch)
+  def load({}, request) do
+    GenServer.call(__MODULE__, request)
+  end
 
-    Jason.decode!(body, keys: :atoms)
+  @impl true
+  def init([]) do
+    {:ok, nil}
+  end
+
+  @impl true
+  def handle_call({:thread, board, thread, callback}, _from, state) do
+    Task.Supervisor.start_child(Annoying.FC.TaskSupervisor, fn ->
+      {:ok, %Response{status: 200, body: body}} =
+        Finch.build(:get, "https://a.4cdn.org/#{board}/thread/#{thread}.json")
+        |> Finch.request(Annoying.FC.Finch)
+
+      Jason.decode!(body, keys: :atoms)
+      |> parse_thread()
+      |> callback.()
+    end)
+
+    {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_call({:board, board, callback}, _from, state) do
+    Task.Supervisor.start_child(Annoying.FC.TaskSupervisor, fn ->
+      {:ok, %Response{status: 200, body: body}} =
+        Finch.build(:get, "https://a.4cdn.org/#{board}/threads.json")
+        |> Finch.request(Annoying.FC.Finch)
+
+      Jason.decode!(body, keys: :atoms)
+      |> parse_threads()
+      |> callback.()
+    end)
+
+    {:reply, :ok, state}
+  end
+
+  defp parse_threads(json) do
+    for %{threads: list} <- json,
+        %{no: number, last_modified: timestamp} <- list,
+        {:ok, time} = DateTime.from_unix(timestamp),
+        into: %{},
+        do: {number, time}
+  end
+
+  defp parse_thread(json) do
+    for post <- json.posts do
+      %Post{
+        number: post.no,
+        poster: post.name,
+        time: DateTime.from_unix!(post.time),
+        subject: Map.get(post, :sub),
+        comment: parse_comment(post),
+        attachment: parse_attachment(post)
+      }
+    end
+  end
+
+  defp parse_attachment(json) do
+    with {:ok, id} <- Map.fetch(json, :tim),
+         {:ok, filename} <- Map.fetch(json, :filename),
+         {:ok, extension} <- Map.fetch(json, :ext),
+         do: %{id: id, filename: filename, extension: extension},
+         else: (_ -> nil)
+  end
+
+  defp parse_comment(json) do
+    with {:ok, html} <- Map.fetch(json, :com),
+         {:ok, document} <- Floki.parse_document(html),
+         do: document,
+         else: (_ -> nil)
   end
 end
