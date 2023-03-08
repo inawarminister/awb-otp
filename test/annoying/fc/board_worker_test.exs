@@ -48,4 +48,11 @@ defmodule Annoying.FC.BoardWorkerTest do
     BoardWorker.update(worker)
     assert_receive {:thread_updated, "vt", 1, ~U[2023-01-01 12:01:00Z]}
   end
+
+  test "sink receives :thread_pruned", %{worker: worker} do
+    BoardWorker.prune(worker, ~U[2023-01-01 00:00:00Z])
+    refute_receive {:thread_pruned, "vt", _}
+    BoardWorker.prune(worker, ~U[2023-01-01 12:01:00Z])
+    assert_receive {:thread_pruned, "vt", 1}
+  end
 end

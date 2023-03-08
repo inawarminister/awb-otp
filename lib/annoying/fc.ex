@@ -25,6 +25,9 @@ defmodule Annoying.FC do
     def process({}, {:thread_updated, board, thread, _timestamp}) do
       Annoying.FC.update_thread(board, thread)
     end
+    def process({}, {:thread_pruned, board, thread}) do
+      Annoying.FC.delete_thread(board, thread)
+    end
   end
 
   def spawn_board(board) do
@@ -50,6 +53,10 @@ defmodule Annoying.FC do
 
   def update() do
     for {_, pid} <- list_boards(), do: BoardWorker.update(pid)
+  end
+
+  def prune(deadline) do
+    for {_, pid} <- list_boards(), do: BoardWorker.prune(pid, deadline)
   end
 
   def spawn_thread(board, thread) do
@@ -83,6 +90,13 @@ defmodule Annoying.FC do
     case lookup_thread(board, thread) do
       {:ok, pid} -> ThreadWorker.update(pid)
       _ -> spawn_thread(board, thread)
+    end
+  end
+
+  def delete_thread(board, thread) do
+    case lookup_thread(board, thread) do
+      {:ok, pid} -> ThreadWorker.delete(pid)
+      _ -> :ok
     end
   end
 

@@ -22,6 +22,12 @@ defmodule Annoying.FC.BoardWorker do
     GenServer.cast(server, :update)
   end
 
+  @doc "Signals cache to prune threads older than the specified `deadline`."
+  @spec prune(GenServer.server(), DateTime.t()) :: :ok
+  def prune(server, deadline) do
+    GenServer.cast(server, {:prune, deadline})
+  end
+
   @impl true
   def init(options) do
     state = Enum.into(options, %{data: %{}})
@@ -48,6 +54,17 @@ defmodule Annoying.FC.BoardWorker do
   def handle_cast(:update, state) do
     load_async(state.client, state.board)
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:prune, deadline}, %{data: data} = state) do
+    pruned =
+      for {thread, modified} <- data, DateTime.compare(modified, deadline) == :lt do
+        Event.emit_thread_pruned(state.event_sink, state.board, thread)
+        thread
+      end
+
+    {:noreply, %{state | data: Map.drop(data, pruned)}}
   end
 
   defp load_async(client, board) do
