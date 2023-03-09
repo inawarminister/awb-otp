@@ -29,6 +29,9 @@ defmodule Annoying.FC do
     def process({}, {:thread_pruned, %{board: board, thread: thread}}) do
       Annoying.FC.delete_thread(board, thread)
     end
+
+    def process({}, {:post_mentioned, _}) do
+    end
   end
 
   def spawn_board(board) do

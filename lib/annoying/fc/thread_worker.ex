@@ -48,10 +48,14 @@ defmodule Annoying.FC.ThreadWorker do
   end
 
   @impl true
-  def handle_cast({:fetched_thread, data}, state) do
+  def handle_cast({:fetched_thread, data}, %{data: stored} = state) do
     annotations = %{
       mentions: Post.map_mentions(data)
     }
+
+    if stored do
+      emit_events(data, annotations, state)
+    end
 
     {:noreply, %{state | data: data, annotations: annotations}}
   end
@@ -73,5 +77,26 @@ defmodule Annoying.FC.ThreadWorker do
     Annoying.FC.Client.load_thread(client, board, thread, fn posts ->
       GenServer.cast(pid, {:fetched_thread, posts})
     end)
+  end
+
+  defp emit_events(
+         updated_thread,
+         new_annotations,
+         %{annotations: old_annotations} = state
+       ) do
+    for post <- updated_thread do
+      new_mentions = Map.get(new_annotations.mentions, post.number, 0)
+      old_mentions = Map.get(old_annotations.mentions, post.number, 0)
+
+      if old_mentions < new_mentions do
+        Event.emit_post_mentioned(state.event_sink, %{
+          board: state.board,
+          thread: state.thread,
+          post: post,
+          old_mentions: old_mentions,
+          new_mentions: new_mentions
+        })
+      end
+    end
   end
 end
