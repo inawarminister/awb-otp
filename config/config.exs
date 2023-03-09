@@ -5,3 +5,6 @@ config :annoying, Annoying.Scheduler,
   jobs: [
     # {"* * * * *", {Annoying.FC.BoardWorker, :update, []}}
   ]
+  config :nostrum,
+  token: "", # The token of your bot as a string
+  gateway_intents: :all
