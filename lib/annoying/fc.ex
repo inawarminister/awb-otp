@@ -22,10 +22,11 @@ defmodule Annoying.FC do
   defmodule EventSink do
     @behaviour Annoying.FC.Event
     @impl Annoying.FC.Event
-    def process({}, {:thread_updated, board, thread, _timestamp}) do
+    def process({}, {:thread_updated, %{board: board, thread: thread}}) do
       Annoying.FC.update_thread(board, thread)
     end
-    def process({}, {:thread_pruned, board, thread}) do
+
+    def process({}, {:thread_pruned, %{board: board, thread: thread}}) do
       Annoying.FC.delete_thread(board, thread)
     end
   end
@@ -64,6 +65,7 @@ defmodule Annoying.FC do
       Annoying.FC.Supervisor,
       {ThreadWorker,
        client: {FinchClient, {}},
+       event_sink: {Annoying.FC.EventSink, {}},
        board: board,
        thread: thread,
        name: {:via, Registry, {Annoying.FC.Registry, {:thread, board, thread}}}}

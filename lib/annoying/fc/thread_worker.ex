@@ -1,8 +1,12 @@
 defmodule Annoying.FC.ThreadWorker do
   use GenServer, restart: :transient
 
+  alias Annoying.FC.Post
+  alias Annoying.FC.Event
+
   @type option ::
           {:client, Annoying.FC.Client.t()}
+          | {:event_sink, Event.sink()}
           | {:board, String.t()}
           | {:thread, integer()}
           | {:name, GenServer.name()}
@@ -30,8 +34,8 @@ defmodule Annoying.FC.ThreadWorker do
 
   @impl true
   def init(options) do
-    state = Enum.into(options, %{data: []})
-    load_async(state.client, state.board, state.thread)
+    state = Enum.into(options, %{data: nil, annotations: nil})
+    load_async(state)
     {:ok, state}
   end
 
@@ -45,12 +49,16 @@ defmodule Annoying.FC.ThreadWorker do
 
   @impl true
   def handle_cast({:fetched_thread, data}, state) do
-    {:noreply, %{state | data: data}}
+    annotations = %{
+      mentions: Post.map_mentions(data)
+    }
+
+    {:noreply, %{state | data: data, annotations: annotations}}
   end
 
   @impl true
   def handle_cast(:update, state) do
-    load_async(state.client, state.board, state.thread)
+    load_async(state)
     {:noreply, state}
   end
 
@@ -59,7 +67,7 @@ defmodule Annoying.FC.ThreadWorker do
     {:stop, :normal, %{}}
   end
 
-  defp load_async(client, board, thread) do
+  defp load_async(%{client: client, board: board, thread: thread}) do
     pid = self()
 
     Annoying.FC.Client.load_thread(client, board, thread, fn posts ->

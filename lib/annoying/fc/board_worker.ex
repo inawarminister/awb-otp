@@ -40,10 +40,19 @@ defmodule Annoying.FC.BoardWorker do
     for {thread, modified} <- threads do
       with {:ok, last_modified} <- Map.fetch(data, thread) do
         if DateTime.compare(last_modified, modified) == :lt do
-          Event.emit_thread_updated(state.event_sink, state.board, thread, modified)
+          Event.emit_thread_updated(state.event_sink, %{
+            board: state.board,
+            thread: thread,
+            timestamp: modified
+          })
         end
       else
-        :error -> Event.emit_thread_updated(state.event_sink, state.board, thread, modified)
+        :error ->
+          Event.emit_thread_updated(state.event_sink, %{
+            board: state.board,
+            thread: thread,
+            timestamp: modified
+          })
       end
     end
 
@@ -60,7 +69,11 @@ defmodule Annoying.FC.BoardWorker do
   def handle_cast({:prune, deadline}, %{data: data} = state) do
     pruned =
       for {thread, modified} <- data, DateTime.compare(modified, deadline) == :lt do
-        Event.emit_thread_pruned(state.event_sink, state.board, thread)
+        Event.emit_thread_pruned(state.event_sink, %{
+          board: state.board,
+          thread: thread
+        })
+
         thread
       end
 

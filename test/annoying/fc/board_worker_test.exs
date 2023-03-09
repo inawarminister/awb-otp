@@ -40,19 +40,23 @@ defmodule Annoying.FC.BoardWorkerTest do
   end
 
   test "sink receives :thread_updated", %{client: client, worker: worker} do
-    assert_receive {:thread_updated, "vt", 1, ~U[2023-01-01 12:00:00Z]}
+    assert_receive {:thread_updated,
+                    %{board: "vt", thread: 1, timestamp: ~U[2023-01-01 12:00:00Z]}}
+
     ClientMock.set(client, %{1 => ~U[2023-01-01 12:00:00Z]})
     BoardWorker.update(worker)
-    refute_receive {:thread_updated, "vt", _, _}
+    refute_receive {:thread_updated, _}
     ClientMock.set(client, %{1 => ~U[2023-01-01 12:01:00Z]})
     BoardWorker.update(worker)
-    assert_receive {:thread_updated, "vt", 1, ~U[2023-01-01 12:01:00Z]}
+
+    assert_receive {:thread_updated,
+                    %{board: "vt", thread: 1, timestamp: ~U[2023-01-01 12:01:00Z]}}
   end
 
   test "sink receives :thread_pruned", %{worker: worker} do
     BoardWorker.prune(worker, ~U[2023-01-01 00:00:00Z])
-    refute_receive {:thread_pruned, "vt", _}
+    refute_receive {:thread_pruned, _}
     BoardWorker.prune(worker, ~U[2023-01-01 12:01:00Z])
-    assert_receive {:thread_pruned, "vt", 1}
+    assert_receive {:thread_pruned, %{board: "vt", thread: 1}}
   end
 end

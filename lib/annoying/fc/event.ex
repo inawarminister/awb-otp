@@ -1,21 +1,33 @@
 defmodule Annoying.FC.Event do
   @moduledoc "Common behavior for cache event subscribers."
-  alias Annoying.FC.Types
 
   @type sink :: {module(), term()}
-  @type thread_updated :: {:thread_updated, Types.board(), Types.thread(), DateTime.t()}
-  @type thread_pruned :: {:thread_pruned, Types.board(), Types.thread()}
-  @type t :: thread_updated | thread_pruned
+
+  @type board :: String.id()
+  @type thread :: integer()
+
+  @type thread_updated :: %{
+          board: board,
+          thread: thread,
+          timestamp: DateTime.t()
+        }
+
+  @type thread_pruned :: %{
+          board: board,
+          thread: thread
+        }
+
+  @type t ::
+          {:thread_updated, thread_updated}
+          | {:thread_pruned, thread_pruned}
 
   @callback process(term(), t) :: :ok
 
-  @spec emit_thread_updated(sink, Types.board(), Types.thread(), DateTime.t()) :: :ok
-  def emit_thread_updated({module, term}, board, thread, timestamp) do
-    module.process(term, {:thread_updated, board, thread, timestamp})
-  end
+  @spec emit_thread_updated(sink, thread_updated) :: :ok
+  def emit_thread_updated({module, term}, event),
+    do: module.process(term, {:thread_updated, event})
 
-  @spec emit_thread_pruned(sink, Types.board(), Types.thread()) :: :ok
-  def emit_thread_pruned({module, term}, board, thread) do
-    module.process(term, {:thread_pruned, board, thread})
-  end
+  @spec emit_thread_pruned(sink, thread_pruned) :: :ok
+  def emit_thread_pruned({module, term}, event),
+    do: module.process(term, {:thread_pruned, event})
 end
