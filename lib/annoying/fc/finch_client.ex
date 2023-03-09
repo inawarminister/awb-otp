@@ -31,7 +31,7 @@ defmodule Annoying.FC.FinchClient do
         |> Finch.request(Annoying.FC.Finch)
 
       Jason.decode!(body, keys: :atoms)
-      |> parse_thread()
+      |> parse_thread(board)
       |> callback.()
     end)
 
@@ -61,11 +61,14 @@ defmodule Annoying.FC.FinchClient do
         do: {number, time}
   end
 
-  defp parse_thread(json) do
+  defp parse_thread(json, board) do
     for post <- json.posts do
       %Post{
+        board: board,
+        thread: if(post.resto == 0, do: post.no, else: post.resto),
         number: post.no,
         poster: post.name,
+        op?: post.resto == 0,
         time: DateTime.from_unix!(post.time),
         subject: Map.get(post, :sub),
         comment: parse_comment(post),

@@ -41,9 +41,13 @@ defmodule Annoying.FC.ThreadWorker do
 
   @impl true
   def handle_call({:lookup, number}, _from, %{data: posts} = state) do
-    case Enum.find(posts, fn post -> post.number == number end) do
-      nil -> {:reply, {:error, :post_not_found}, state}
-      post -> {:reply, {:ok, post}, state}
+    if posts do
+      case Enum.find(posts, fn post -> post.number == number end) do
+        nil -> {:reply, {:error, :post_not_found}, state}
+        post -> {:reply, {:ok, post}, state}
+      end
+    else
+      {:reply, {:error, :post_not_found}, state}
     end
   end
 

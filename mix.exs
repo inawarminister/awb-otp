@@ -7,6 +7,7 @@ defmodule Annoying.MixProject do
       version: "0.1.0",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps()
     ]
   end
@@ -26,6 +27,12 @@ defmodule Annoying.MixProject do
       {:floki, "~> 0.34.0"},
       {:finch, "~> 0.3.0"},
       {:jason, "~> 1.4"}
+    ]
+  end
+
+  defp aliases do
+    [
+      test: "test --no-start"
     ]
   end
 end

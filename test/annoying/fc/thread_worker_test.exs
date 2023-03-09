@@ -29,13 +29,16 @@ defmodule Annoying.FC.ThreadWorkerTest do
   end
 
   @op %Post{
+    op?: true,
+    board: "s4s",
+    thread: 1,
     number: 1,
     time: ~U[2023-01-01 12:00:00Z],
     poster: "Anonymous",
     subject: "time to shine niceagents",
     comment:
       Floki.parse_document!("""
-      lets all give out best to make [s4s] a nicer place :^)
+      lets all give our best to make [s4s] a nicer place :^)
       <br>
       new nicefren thread
       <span class="fortune" style="color:#bac200">
@@ -47,6 +50,8 @@ defmodule Annoying.FC.ThreadWorkerTest do
   }
 
   @reply %Post{
+    board: "s4s",
+    thread: 1,
     number: 2,
     time: ~U[2023-01-01 12:05:00Z],
     poster: "Anonymous",
