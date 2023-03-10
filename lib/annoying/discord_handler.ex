@@ -32,9 +32,15 @@ defmodule Annoying.DiscordHandler do
     with {:ok, {board, thread_id, post_id}} <- Post.parse_link(content),
          {:ok, post} <- Annoying.FC.lookup_post(board, thread_id, post_id) do
       embed = as_embed(post)
-      Task.Supervisor.start_child(Annoying.DiscordTaskSupervisor, fn ->
-        Api.create_message!(channel, embed: embed)
-      end, restart: :transient)
+
+      Task.Supervisor.start_child(
+        Annoying.DiscordTaskSupervisor,
+        fn ->
+          Api.create_message!(channel, embed: embed)
+        end,
+        restart: :transient
+      )
+
       :handled
     else
       _ -> :ignored
