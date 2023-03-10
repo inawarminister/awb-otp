@@ -22,7 +22,6 @@ defmodule Annoying.MixProject do
   defp deps do
     [
       {:nostrum, "~> 0.6.1"},
-      {:nimble_parsec, "~> 1.0"},
       {:quantum, "~> 3.0"},
       {:floki, "~> 0.34.0"},
       {:finch, "~> 0.3.0"},

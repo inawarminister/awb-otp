@@ -4,8 +4,9 @@ defmodule Annoying.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      Annoying.Scheduler,
-      Annoying.FC
+      Annoying.FC,
+      {Task.Supervisor, name: Annoying.DiscordTaskSupervisor},
+      Annoying.Scheduler
     ]
 
     opts = [strategy: :one_for_one, name: Annoying.Supervisor]
