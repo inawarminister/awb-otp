@@ -33,7 +33,12 @@ defmodule Annoying.FC.BoardWorkerTest do
     worker =
       start_supervised!({
         BoardWorker,
-        client: {ClientMock, client}, event_sink: {MockEventSink, self()}, board: "vt"
+        %{
+          client: {ClientMock, client},
+          event_sink: {MockEventSink, self()},
+          board: "vt",
+          data: %{}
+        }
       })
 
     %{client: client, worker: worker}

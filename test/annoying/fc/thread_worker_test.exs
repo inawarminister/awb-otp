@@ -69,7 +69,14 @@ defmodule Annoying.FC.ThreadWorkerTest do
     worker =
       start_supervised!({
         ThreadWorker,
-        client: {ClientMock, client}, event_sink: {MockEventSink, self()}, board: "s4s", thread: 1
+        %{
+          client: {ClientMock, client},
+          event_sink: {MockEventSink, self()},
+          board: "s4s",
+          thread: 1,
+          data: [],
+          annotations: nil
+        }
       })
 
     %{client: client, worker: worker}

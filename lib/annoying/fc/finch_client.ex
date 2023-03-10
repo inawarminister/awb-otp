@@ -1,16 +1,14 @@
 defmodule Annoying.FC.FinchClient do
   use GenServer
+
   alias Annoying.FC.Client
   alias Annoying.FC.Post
   alias Finch.Response
+
   @behaviour Client
 
-  def start_link(options) do
-    GenServer.start_link(
-      __MODULE__,
-      [],
-      Keyword.take(options, [:name])
-    )
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, {}, opts)
   end
 
   @impl Client
@@ -19,8 +17,8 @@ defmodule Annoying.FC.FinchClient do
   end
 
   @impl true
-  def init([]) do
-    {:ok, nil}
+  def init({}) do
+    {:ok, {}}
   end
 
   @impl true

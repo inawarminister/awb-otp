@@ -15,10 +15,14 @@ defmodule Annoying.FC.Post do
     op?: false
   ]
 
+  @type board_id :: String.t()
+  @type thread_id :: integer()
+  @type post_id :: integer()
+
   @type t :: %Post{
-          board: String.t(),
-          thread: integer(),
-          number: integer(),
+          board: board_id,
+          thread: thread_id,
+          number: post_id,
           time: DateTime.t(),
           poster: String.t(),
           op?: boolean(),
@@ -36,9 +40,8 @@ defmodule Annoying.FC.Post do
   @ref_pattern ~r{>>(?<ref>[[:digit:]]+)}
   @link_pattern ~r{https://boards.4channel.org/(?<board>[[:alnum:]]+)/thread/(?<thread>[[:digit:]]+)(#p(?<post>[[:digit:]]))?}
 
-  @doc "Parse post reference link."
-  @spec parse_link(String.t()) ::
-          {:ok, %{board: String.t(), thread: integer(), post: integer()}} | :error
+  @doc "Parse post reference link and return post identifier tuple on success."
+  @spec parse_link(String.t()) :: {:ok, {board_id, thread_id, post_id}} | nil
   def parse_link(text) do
     case Regex.named_captures(@link_pattern, text) do
       %{"board" => board, "thread" => thread, "post" => post} ->
@@ -49,14 +52,15 @@ defmodule Annoying.FC.Post do
                do: parsed,
                else: (_ -> thread_id)
 
-        {:ok, %{board: board, thread: thread_id, post: post_id}}
+        {:ok, {board, thread_id, post_id}}
 
       _ ->
-        :error
+        nil
     end
   end
 
   @doc "Lists posts referenced by this posts' comment."
+  @spec references(%Post{}) :: [post_id]
   def references(%Post{comment: comment}) do
     Floki.find(comment, "a.quotelink")
     |> Enum.map(&Floki.children/1)
@@ -73,17 +77,14 @@ defmodule Annoying.FC.Post do
   end
 
   @doc "Returns attachment link if post has an attachment"
-  def attachment_link(%Post{board: board} = post) do
-    case post.attachment do
-      %{id: id, extension: ext} ->
-        {:ok, "https://i.4cdn.org/#{board}/#{id}#{ext}"}
-
-      nil ->
-        :error
-    end
+  @spec attachment_link(%Post{}) :: {:ok, String.t()} | nil
+  def attachment_link(%Post{board: board, attachment: attachment}) do
+    with %{id: id, extension: ext} <- attachment,
+         do: {:ok, "https://i.4cdn.org/#{board}/#{id}#{ext}"}
   end
 
   @doc "Returns post link."
+  @spec link(%Post{}) :: String.t()
   def link(post) do
     case post do
       %Post{op?: true, board: board, thread: thread} ->
@@ -95,10 +96,11 @@ defmodule Annoying.FC.Post do
   end
 
   @doc "Returns comment as plain text."
+  @spec text(%Post{}) :: String.t()
   def text(%Post{comment: comment}), do: Floki.text(comment)
 
   @doc "Traverse a list of posts and build a map of number of mentions to each post."
-  @spec map_mentions([Post.t()]) :: %{integer() => integer()}
+  @spec map_mentions([Post.t()]) :: %{post_id => integer()}
   def map_mentions(list) do
     list
     |> Enum.map(&Post.references/1)

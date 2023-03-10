@@ -5,7 +5,7 @@ defmodule Annoying.FC.Event do
 
   @type sink :: {module(), term()}
 
-  @type board :: String.id()
+  @type board :: String.t()
   @type thread :: integer()
 
   @type thread_updated :: %{

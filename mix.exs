@@ -26,7 +26,8 @@ defmodule Annoying.MixProject do
       {:quantum, "~> 3.0"},
       {:floki, "~> 0.34.0"},
       {:finch, "~> 0.3.0"},
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
     ]
   end
 

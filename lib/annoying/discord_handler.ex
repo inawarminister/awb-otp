@@ -7,15 +7,15 @@ defmodule Annoying.DiscordHandler do
   alias Nostrum.Struct.Embed
   alias Nostrum.Struct.Message
 
-  @spec start_link :: :ignore | {:error, any} | {:ok, pid}
-  def start_link do
+  def start_link() do
     Consumer.start_link(__MODULE__)
   end
 
   def handle_event({:MESSAGE_CREATE, %Message{content: content, channel_id: channel}, _ws_state}) do
-    with {:ok, %{board: board, thread: thread, post: post_id}} <- Post.parse_link(content),
-         {:ok, post} <- Annoying.FC.lookup_post(board, thread, post_id),
-         do: Api.create_message!(channel, embed: as_embed(post))
+    with {:ok, {board, thread_id, post_id}} <- Post.parse_link(content),
+         {:ok, post} <- Annoying.FC.lookup_post(board, thread_id, post_id),
+         do: Api.create_message(channel, embed: as_embed(post)),
+         else: (_ -> :ignore)
   end
 
   def handle_event(_event) do

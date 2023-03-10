@@ -38,10 +38,13 @@ defmodule Annoying.FC do
     DynamicSupervisor.start_child(
       Annoying.FC.Supervisor,
       {BoardWorker,
-       client: {FinchClient, {}},
-       event_sink: {Annoying.FC.EventSink, {}},
-       board: board,
-       name: {:via, Registry, {Annoying.FC.Registry, {:board, board}}}}
+       %{
+         client: {FinchClient, {}},
+         event_sink: {Annoying.FC.EventSink, {}},
+         board: board,
+         data: %{},
+         name: {:via, Registry, {Annoying.FC.Registry, {:board, board}}}
+       }}
     )
   end
 
@@ -67,11 +70,15 @@ defmodule Annoying.FC do
     DynamicSupervisor.start_child(
       Annoying.FC.Supervisor,
       {ThreadWorker,
-       client: {FinchClient, {}},
-       event_sink: {Annoying.FC.EventSink, {}},
-       board: board,
-       thread: thread,
-       name: {:via, Registry, {Annoying.FC.Registry, {:thread, board, thread}}}}
+       %{
+         client: {FinchClient, {}},
+         event_sink: {Annoying.FC.EventSink, {}},
+         board: board,
+         thread: thread,
+         data: [],
+         annotations: nil,
+         name: {:via, Registry, {Annoying.FC.Registry, {:thread, board, thread}}}
+       }}
     )
   end
 
