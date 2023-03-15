@@ -26,6 +26,7 @@ defmodule Annoying.MixProject do
       {:floki, "~> 0.34.0"},
       {:finch, "~> 0.3.0"},
       {:jason, "~> 1.4"},
+      {:nimble_parsec, "~> 1.0"},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
     ]
   end
