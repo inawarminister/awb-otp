@@ -2,12 +2,11 @@ defmodule Annoying.DiscordAdmin do
   import NimbleParsec
   Module.register_attribute(__MODULE__, :command, accumulate: true)
 
-  @type command :: enable_embeds_t | disable_embeds_t
-  @type enable_embeds_t :: {:enable_embeds, %{board: String.t()}}
-  @type disable_embeds_t :: {:disable_embeds, %{board: String.t()}}
+  @type command :: embeds
+  @type embeds :: {:embeds, %{board: String.t(), enabled: bool()}}
 
-  @command {:enable_embeds, [:board]}
-  @command {:disable_embeds, [:board]}
+  @command {:embeds, enabled: :boolean, board: :board}
+
   @commands Enum.into(@command, %{}, fn
               {atom, requirements} -> {Atom.to_string(atom), {atom, requirements}}
             end)
@@ -18,34 +17,49 @@ defmodule Annoying.DiscordAdmin do
       {:error, reason, rest, %{}, _pos, _offset} ->
         {:error, "Unable to parse command: #{reason} at `#{rest}`"}
 
-      {:ok, [name | args], "", %{}, _pos, _offset} ->
-        transform_results(name, Enum.into(args, %{}))
+      {:ok, [cmd | args], "", %{}, _pos, _offset} ->
+        tranform_cmd(cmd, Enum.into(args, %{}))
     end
   end
 
-  defp transform_results(name, args) do
-    case Map.fetch(@commands, name) do
+  defp tranform_cmd(cmd, args) do
+    case Map.fetch(@commands, cmd) do
       :error ->
-        similar = Enum.max_by(Map.keys(@commands), &String.jaro_distance(name, &1))
-        {:error, "Did you mean `#{similar}`?"}
+        similar = Enum.max_by(Map.keys(@commands), &String.jaro_distance(cmd, &1))
+        {:error, "Unknown command `#{cmd}`. Did you mean `#{similar}`?"}
 
-      {:ok, {atom, required}} ->
-        transform_args_into(atom, args, required, %{})
+      {:ok, {atom, reqs}} ->
+        transform_args(atom, reqs, args, %{})
     end
   end
 
-  defp transform_args_into(atom, _args, [], map) do
-    {:ok, {atom, map}}
+  defp transform_args(cmd, [], _args, pars) do
+    {:ok, {cmd, pars}}
   end
 
-  defp transform_args_into(atom, args, [arg | required], map) do
-    case Map.fetch(args, Atom.to_string(arg)) do
+  defp transform_args(cmd, [{atom, type} | reqs], args, pars) do
+    case Map.fetch(args, Atom.to_string(atom)) do
       :error ->
-        {:error, "Missing parameter `#{arg}`"}
+        {:error, "Missing parameter `#{atom}`"}
 
-      {:ok, value} ->
-        transform_args_into(atom, args, required, Map.put(map, arg, value))
+      {:ok, val} ->
+        with {:ok, sanitized} <- sanitize(atom, type, val) do
+          transform_args(cmd, reqs, args, Map.put(pars, atom, sanitized))
+        end
     end
+  end
+
+  defp sanitize(_, :boolean, {"yes", :id}), do: {:ok, true}
+  defp sanitize(_, :boolean, {"no", :id}), do: {:ok, false}
+
+  defp sanitize(name, :boolean, _) do
+    {:error, "Incorrect value for `#{name}`, should be `yes` or `no`."}
+  end
+
+  defp sanitize(_, :board, {"vt", :id}), do: {:ok, "vt"}
+
+  defp sanitize(name, :board, _) do
+    {:error, "Incorrect value for `#{name}`, should be `vt`."}
   end
 
   term_whitespace =
@@ -62,12 +76,19 @@ defmodule Annoying.DiscordAdmin do
     |> repeat(utf8_char([{:not, ?"}]))
     |> ignore(utf8_char([?"]))
     |> reduce(:to_string)
+    |> map({:{}, [:string]})
+
+  term_number =
+    integer(min: 1)
+    |> map({:{}, [:integer]})
+
+  term = choice([term_string, term_number, map(term_id, {:{}, [:id]})])
 
   rule_parameter =
     term_id
     |> ignore(string(":"))
     |> concat(term_whitespace)
-    |> concat(term_string)
+    |> concat(term)
     |> post_traverse(:post_traverse_rule_parameter)
 
   defp post_traverse_rule_parameter(r, [value, key], ctx, _line, _offset) do
