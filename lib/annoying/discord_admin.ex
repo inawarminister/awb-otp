@@ -11,11 +11,11 @@ defmodule Annoying.DiscordAdmin do
               {atom, requirements} -> {Atom.to_string(atom), {atom, requirements}}
             end)
 
-  @spec parse_text(String.t()) :: {:ok, command} | {:error, String.t()}
+  @spec parse_text(String.t()) :: {:ok, command} | {:error, String.t(), String.t()}
   def parse_text(text) do
     case parse_command(String.trim(text)) do
       {:error, reason, rest, %{}, _pos, _offset} ->
-        {:error, "Unable to parse command: #{reason} at `#{rest}`"}
+        {:error, "Unable to parse a bot command", "#{reason} at `#{rest}`"}
 
       {:ok, [cmd | args], "", %{}, _pos, _offset} ->
         tranform_cmd(cmd, Enum.into(args, %{}))
@@ -26,7 +26,7 @@ defmodule Annoying.DiscordAdmin do
     case Map.fetch(@commands, cmd) do
       :error ->
         similar = Enum.max_by(Map.keys(@commands), &String.jaro_distance(cmd, &1))
-        {:error, "Unknown command `#{cmd}`. Did you mean `#{similar}`?"}
+        {:error, "Unknown command `#{cmd}`", "Did you mean `#{similar}`?"}
 
       {:ok, {atom, reqs}} ->
         transform_args(atom, reqs, args, %{})
@@ -40,7 +40,7 @@ defmodule Annoying.DiscordAdmin do
   defp transform_args(cmd, [{atom, type} | reqs], args, pars) do
     case Map.fetch(args, Atom.to_string(atom)) do
       :error ->
-        {:error, "Missing parameter `#{atom}`"}
+        {:error, "Incorrect command", "Missing parameter `#{atom}`"}
 
       {:ok, val} ->
         with {:ok, sanitized} <- sanitize(atom, type, val) do
@@ -53,13 +53,13 @@ defmodule Annoying.DiscordAdmin do
   defp sanitize(_, :boolean, {"no", :id}), do: {:ok, false}
 
   defp sanitize(name, :boolean, _) do
-    {:error, "Incorrect value for `#{name}`, should be `yes` or `no`."}
+    {:error, "Incorrect command", "Incorrect value for `#{name}`, should be `yes` or `no`."}
   end
 
   defp sanitize(_, :board, {"vt", :id}), do: {:ok, "vt"}
 
   defp sanitize(name, :board, _) do
-    {:error, "Incorrect value for `#{name}`, should be `vt`."}
+    {:error, "Incorrent command", "Incorrect value for `#{name}`, should be `vt`."}
   end
 
   term_whitespace =
